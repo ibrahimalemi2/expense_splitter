@@ -334,11 +334,14 @@ function seedDatabase() {
   `);
 
   const users = [
-    { name: 'Ali Khan', room: '101', pin: '1234', role: 'admin', status: 'active', color: '#10b981' },
-    { name: 'Bilal Ahmed', room: '101', pin: '2345', role: 'member', status: 'active', color: '#3b82f6' },
-    { name: 'Usman Tariq', room: '102', pin: '3456', role: 'member', status: 'active', color: '#8b5cf6' },
-    { name: 'Hamza Sheikh', room: '102', pin: '4567', role: 'member', status: 'at_home', color: '#f59e0b' },
-    { name: 'Zaid Farooq', room: '103', pin: '5678', role: 'member', status: 'active', color: '#ec4899' },
+    { name: 'Mohammad Ibrahim', room: '', pin: '1234', role: 'admin', status: 'active', color: '#10b981' },
+    { name: 'Mir Hamza', room: '', pin: '2345', role: 'member', status: 'active', color: '#3b82f6' },
+    { name: 'Kashef', room: '', pin: '3456', role: 'member', status: 'active', color: '#8b5cf6' },
+    { name: 'Dr. Rahmanullah', room: '', pin: '4567', role: 'member', status: 'active', color: '#f59e0b' },
+    { name: 'Ahmad Sherzad', room: '', pin: '5678', role: 'member', status: 'active', color: '#ec4899' },
+    { name: 'Atiqullah', room: '', pin: '6789', role: 'member', status: 'active', color: '#06b6d4' },
+    { name: 'Layeq', room: '', pin: '7890', role: 'member', status: 'active', color: '#14b8a6' },
+    { name: 'Nazifullah', room: '', pin: '8901', role: 'member', status: 'active', color: '#f97316' },
   ];
 
   const userIds = {};
@@ -379,54 +382,43 @@ function seedDatabase() {
     VALUES (?, ?, ?)
   `);
 
-  // Meal 1: Dinner 2 days ago (Biryani) - Ali paid 800 for Ali, Bilal, Usman, Zaid (Hamza is at home)
+  const allUserIdsList = Object.values(userIds);
+
+  // Meal 1: Dinner 2 days ago (Biryani) - Mohammad Ibrahim paid 1600 for all 8 members
   const d2 = new Date(today);
   d2.setDate(today.getDate() - 2);
   const d2Str = d2.toISOString().split('T')[0];
   
-  const m1 = insertMeal.run(cycleId, userIds['Ali Khan'], 800, 'Dinner', d2Str, 'Special Biryani & Cold Drinks');
+  const m1 = insertMeal.run(cycleId, userIds['Mohammad Ibrahim'], 1600, 'Dinner', d2Str, 'Special Chicken Biryani & Cold Drinks');
   const m1Id = Number(m1.lastInsertRowid);
-  const m1Attendees = [userIds['Ali Khan'], userIds['Bilal Ahmed'], userIds['Usman Tariq'], userIds['Zaid Farooq']];
-  const m1Share = Math.round((800 / m1Attendees.length) * 100) / 100;
-  for (const uid of m1Attendees) {
+  const m1Share = Math.round((1600 / allUserIdsList.length) * 100) / 100;
+  for (const uid of allUserIdsList) {
     insertAttendee.run(m1Id, uid, m1Share);
   }
 
-  // Meal 2: Breakfast yesterday (Omelette, Parathas & Chai) - Bilal paid 360 for Ali, Bilal, Usman
+  // Meal 2: Breakfast yesterday (Omelette, Parathas & Chai) - Mir Hamza paid 800 for all 8 members
   const d1 = new Date(today);
   d1.setDate(today.getDate() - 1);
   const d1Str = d1.toISOString().split('T')[0];
 
-  const m2 = insertMeal.run(cycleId, userIds['Bilal Ahmed'], 360, 'Breakfast', d1Str, 'Desi Paratha & Karak Chai');
+  const m2 = insertMeal.run(cycleId, userIds['Mir Hamza'], 800, 'Breakfast', d1Str, 'Desi Paratha, Omelettes & Karak Chai');
   const m2Id = Number(m2.lastInsertRowid);
-  const m2Attendees = [userIds['Ali Khan'], userIds['Bilal Ahmed'], userIds['Usman Tariq']];
-  const m2Share = Math.round((360 / m2Attendees.length) * 100) / 100;
-  for (const uid of m2Attendees) {
+  const m2Share = Math.round((800 / allUserIdsList.length) * 100) / 100;
+  for (const uid of allUserIdsList) {
     insertAttendee.run(m2Id, uid, m2Share);
   }
 
-  // Meal 3: General Mess Grocery (Spices, Cooking Oil, Dishwash) - Usman paid 1200 for all 4 active members
-  const m3 = insertMeal.run(cycleId, userIds['Usman Tariq'], 1200, 'General', d1Str, 'Cooking Oil, Spices, Flour & Tea');
+  // Meal 3: General Mess Grocery (Spices, Cooking Oil, Dishwash) - Atiqullah paid 1200 for all members
+  const m3 = insertMeal.run(cycleId, userIds['Atiqullah'], 1200, 'General', d1Str, 'Cooking Oil, Spices, Flour & Tea');
   const m3Id = Number(m3.lastInsertRowid);
-  const m3Attendees = [userIds['Ali Khan'], userIds['Bilal Ahmed'], userIds['Usman Tariq'], userIds['Zaid Farooq']];
-  const m3Share = Math.round((1200 / m3Attendees.length) * 100) / 100;
-  for (const uid of m3Attendees) {
+  const m3Share = Math.round((1200 / allUserIdsList.length) * 100) / 100;
+  for (const uid of allUserIdsList) {
     insertAttendee.run(m3Id, uid, m3Share);
-  }
-
-  // Meal 4: Lunch today (Daal Chawal & Salad) - Zaid paid 400 for Ali, Bilal, Usman, Zaid
-  const todayStr = today.toISOString().split('T')[0];
-  const m4 = insertMeal.run(cycleId, userIds['Zaid Farooq'], 400, 'Lunch', todayStr, 'Moong Daal, Rice & Salad');
-  const m4Id = Number(m4.lastInsertRowid);
-  const m4Attendees = [userIds['Ali Khan'], userIds['Bilal Ahmed'], userIds['Usman Tariq'], userIds['Zaid Farooq']];
-  const m4Share = Math.round((400 / m4Attendees.length) * 100) / 100;
-  for (const uid of m4Attendees) {
-    insertAttendee.run(m4Id, uid, m4Share);
   }
 
   // Recalculate cycle balances
   recalculateCycleBalances(cycleId);
-  console.log('Seed completed successfully!');
+  console.log('Seed completed successfully with all 8 real hostel members!');
 }
 
 /**

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ShieldCheck, UserCheck, KeyRound, Home, ArrowLeft, Delete, Sparkles, UtensilsCrossed } from 'lucide-react';
 import { showToast } from './Toast';
+import { DEFAULT_PINS } from '../services/fallbackStorage';
 
 export function LoginScreen() {
   const { users, login } = useAuth();
@@ -9,6 +10,11 @@ export function LoginScreen() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const adminUser = users.find(u => u.role === 'admin') || users[0] || { name: 'Mohammad Ibrahim', role: 'admin' };
+  const cookOrMember = users.find(u => u.name === 'Atiqullah') || users.find(u => u.role === 'member') || { name: 'Atiqullah', role: 'member' };
+  const adminPin = adminUser?.pin || DEFAULT_PINS[adminUser?.name] || '1234';
+  const memberPin = cookOrMember?.pin || DEFAULT_PINS[cookOrMember?.name] || '6789';
 
   const handleSelectUser = (user) => {
     setSelectedUser(user);
@@ -144,25 +150,19 @@ export function LoginScreen() {
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
-                  onClick={() => {
-                    const admin = users.find(u => u.role === 'admin') || users[0];
-                    if (admin) handleQuickDemo(admin, '1234');
-                  }}
+                  onClick={() => handleQuickDemo(adminUser, adminPin)}
                   className="p-2 rounded-lg bg-slate-900 hover:bg-emerald-950/40 text-slate-300 hover:text-emerald-300 border border-slate-800 hover:border-emerald-500/40 text-xs transition-colors flex items-center justify-between"
                 >
-                  <span className="truncate font-medium">👑 Ali (Admin)</span>
-                  <span className="text-[10px] text-slate-400 font-mono">PIN: 1234</span>
+                  <span className="truncate font-medium">👑 {adminUser.name}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">PIN: {adminPin}</span>
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const member = users.find(u => u.role === 'member') || users[1];
-                    if (member) handleQuickDemo(member, '2345');
-                  }}
+                  onClick={() => handleQuickDemo(cookOrMember, memberPin)}
                   className="p-2 rounded-lg bg-slate-900 hover:bg-indigo-950/40 text-slate-300 hover:text-indigo-300 border border-slate-800 hover:border-indigo-500/40 text-xs transition-colors flex items-center justify-between"
                 >
-                  <span className="truncate font-medium">👤 Bilal (Member)</span>
-                  <span className="text-[10px] text-slate-400 font-mono">PIN: 2345</span>
+                  <span className="truncate font-medium">👨‍🍳 {cookOrMember.name}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">PIN: {memberPin}</span>
                 </button>
               </div>
             </div>
@@ -267,7 +267,7 @@ export function LoginScreen() {
             {/* Hint for PIN */}
             <div className="mt-4 text-center">
               <span className="text-[11px] text-slate-400">
-                Hint: Default PIN is <code className="text-emerald-400 font-mono">{selectedUser.pin || (selectedUser.role === 'admin' ? '1234' : '2345')}</code>
+                Hint: Default PIN is <code className="text-emerald-400 font-mono">{selectedUser.pin || DEFAULT_PINS[selectedUser.name] || (selectedUser.role === 'admin' ? '1234' : '2345')}</code>
               </span>
             </div>
           </div>

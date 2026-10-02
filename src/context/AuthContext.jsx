@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { fallbackStorage } from '../services/fallbackStorage';
 
 const AuthContext = createContext(null);
 
@@ -10,12 +11,17 @@ export function AuthProvider({ children }) {
 
   const fetchUsers = async () => {
     try {
-      const data = await api.getUsers();
+      let data = await api.getUsers();
+      if (!data || !Array.isArray(data) || data.length === 0) {
+        data = fallbackStorage.getUsers();
+      }
       setUsers(data);
       return data;
     } catch (err) {
-      console.error('Failed to load users', err);
-      return [];
+      console.error('Failed to load users, using fallback storage', err);
+      const fallback = fallbackStorage.getUsers();
+      setUsers(fallback);
+      return fallback;
     }
   };
 

@@ -1,7 +1,13 @@
 /**
  * Central API client for Hostel Mess & Expense Splitter
+ * Dual-Mode: Communicates with Express SQLite backend when online,
+ * or transparently fails over to client-side localStorage fallback
+ * for static hosting (GitHub Pages, Vercel, Netlify) or offline use.
  */
+import { fallbackStorage } from './fallbackStorage';
+
 const BASE_URL = '/api';
+let isFallbackMode = false;
 
 function getHeaders(currentUser) {
   const headers = {
@@ -14,214 +20,282 @@ function getHeaders(currentUser) {
   return headers;
 }
 
+async function requestOrFallback(url, options, fallbackAction) {
+  if (isFallbackMode) {
+    return fallbackAction();
+  }
+
+  try {
+    const res = await fetch(url, options);
+    const contentType = res.headers.get('content-type') || '';
+
+    // If endpoint returns 404 or an HTML page (static hosting fallback like GitHub Pages)
+    if (res.status === 404 || contentType.includes('text/html')) {
+      console.warn(`[MessApp] Backend API not available at ${url}. Switching to client fallback storage.`);
+      isFallbackMode = true;
+      return fallbackAction();
+    }
+
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || 'Request failed');
+    }
+    return data;
+  } catch (err) {
+    // If it's a business logic / validation error from backend, rethrow it
+    if (
+      err.message &&
+      !err.message.includes('Failed to fetch') &&
+      !err.message.includes('NetworkError') &&
+      !err.message.includes('JSON') &&
+      !err.message.includes('Unexpected token')
+    ) {
+      throw err;
+    }
+    console.warn(`[MessApp] API connection failed. Using client fallback storage.`, err);
+    isFallbackMode = true;
+    return fallbackAction();
+  }
+}
+
 export const api = {
   // Users & Auth
   async getUsers() {
-    const res = await fetch(`${BASE_URL}/users`);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      `${BASE_URL}/users`,
+      undefined,
+      () => fallbackStorage.getUsers()
+    );
   },
 
   async login(userId, pin) {
-    const res = await fetch(`${BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId, pin }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Login failed');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/auth/login`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, pin }),
+      },
+      () => fallbackStorage.login(userId, pin)
+    );
   },
 
   async createUser(userData, currentUser) {
-    const res = await fetch(`${BASE_URL}/users`, {
-      method: 'POST',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify(userData),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to create user');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/users`,
+      {
+        method: 'POST',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify(userData),
+      },
+      () => fallbackStorage.createUser(userData)
+    );
   },
 
   async updateUserStatus(userId, status, currentUser) {
-    const res = await fetch(`${BASE_URL}/users/${userId}/status`, {
-      method: 'PATCH',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify({ status }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to update member status');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/users/${userId}/status`,
+      {
+        method: 'PATCH',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify({ status }),
+      },
+      () => fallbackStorage.updateUserStatus(userId, status)
+    );
   },
 
   async updateUser(userId, userData, currentUser) {
-    const res = await fetch(`${BASE_URL}/users/${userId}`, {
-      method: 'PUT',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify(userData),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to update member');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/users/${userId}`,
+      {
+        method: 'PUT',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify(userData),
+      },
+      () => fallbackStorage.updateUser(userId, userData)
+    );
   },
 
   async deleteUser(userId, currentUser) {
-    const res = await fetch(`${BASE_URL}/users/${userId}`, {
-      method: 'DELETE',
-      headers: getHeaders(currentUser),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to delete member');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/users/${userId}`,
+      {
+        method: 'DELETE',
+        headers: getHeaders(currentUser),
+      },
+      () => fallbackStorage.deleteUser(userId)
+    );
   },
 
   async changePin(userId, currentPin, newPin, currentUser) {
-    const res = await fetch(`${BASE_URL}/users/${userId}/pin`, {
-      method: 'PATCH',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify({ currentPin, newPin }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to change PIN');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/users/${userId}/pin`,
+      {
+        method: 'PATCH',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify({ currentPin, newPin }),
+      },
+      () => fallbackStorage.changePin(userId, currentPin, newPin, currentUser?.role === 'admin')
+    );
   },
 
   // Cycles
   async getCurrentCycle() {
-    const res = await fetch(`${BASE_URL}/cycles/current`);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      `${BASE_URL}/cycles/current`,
+      undefined,
+      () => fallbackStorage.getCurrentCycle()
+    );
   },
 
   async getCycles() {
-    const res = await fetch(`${BASE_URL}/cycles`);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      `${BASE_URL}/cycles`,
+      undefined,
+      () => fallbackStorage.getCycles()
+    );
   },
 
   async closeCycle(carryForward, currentUser) {
-    const res = await fetch(`${BASE_URL}/cycles/close`, {
-      method: 'POST',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify({ carryForward }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to close cycle');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/cycles/close`,
+      {
+        method: 'POST',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify({ carryForward }),
+      },
+      () => fallbackStorage.closeCycle(carryForward)
+    );
   },
 
   // Meals
   async getMeals(cycleId) {
     const url = cycleId ? `${BASE_URL}/meals?cycle_id=${cycleId}` : `${BASE_URL}/meals`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      url,
+      undefined,
+      () => fallbackStorage.getMeals()
+    );
   },
 
   async recordMeal(mealData, currentUser) {
-    const res = await fetch(`${BASE_URL}/meals`, {
-      method: 'POST',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify(mealData),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to record meal');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/meals`,
+      {
+        method: 'POST',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify(mealData),
+      },
+      () => fallbackStorage.recordMeal(mealData)
+    );
   },
 
   async updateMeal(mealId, mealData, currentUser) {
-    const res = await fetch(`${BASE_URL}/meals/${mealId}`, {
-      method: 'PUT',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify(mealData),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to update meal');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/meals/${mealId}`,
+      {
+        method: 'PUT',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify(mealData),
+      },
+      () => fallbackStorage.updateMeal(mealId, mealData)
+    );
   },
 
   async deleteMeal(mealId, currentUser) {
-    const res = await fetch(`${BASE_URL}/meals/${mealId}`, {
-      method: 'DELETE',
-      headers: getHeaders(currentUser),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to delete meal');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/meals/${mealId}`,
+      {
+        method: 'DELETE',
+        headers: getHeaders(currentUser),
+      },
+      () => fallbackStorage.deleteMeal(mealId)
+    );
   },
 
   // Dashboard & Settlement
   async getDashboard(userId) {
     const url = userId ? `${BASE_URL}/dashboard?user_id=${userId}` : `${BASE_URL}/dashboard`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      url,
+      undefined,
+      () => fallbackStorage.getDashboard(userId)
+    );
   },
 
   async getSettlement(cycleId) {
     const url = cycleId ? `${BASE_URL}/settlement?cycle_id=${cycleId}` : `${BASE_URL}/settlement`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      url,
+      undefined,
+      () => fallbackStorage.getSettlement()
+    );
   },
 
   // Cooking Duty Queue
   async getCookingDuty(userId) {
     const url = userId ? `${BASE_URL}/cooking-duty?user_id=${userId}` : `${BASE_URL}/cooking-duty`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      url,
+      undefined,
+      () => fallbackStorage.getCookingDuty(userId)
+    );
   },
 
   async completeCookingDuty(currentUser) {
-    const res = await fetch(`${BASE_URL}/cooking-duty/complete`, {
-      method: 'POST',
-      headers: getHeaders(currentUser),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to complete cooking duty');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/cooking-duty/complete`,
+      {
+        method: 'POST',
+        headers: getHeaders(currentUser),
+      },
+      () => fallbackStorage.completeCookingDuty()
+    );
   },
 
   async setCurrentCook(userId, currentUser) {
-    const res = await fetch(`${BASE_URL}/cooking-duty/set-current`, {
-      method: 'PATCH',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify({ userId }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to set current cook');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/cooking-duty/set-current`,
+      {
+        method: 'PATCH',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify({ userId }),
+      },
+      () => fallbackStorage.setCurrentCook(userId)
+    );
   },
 
   async reorderCookingQueue(orderedUserIds, currentUser) {
-    const res = await fetch(`${BASE_URL}/cooking-duty/reorder`, {
-      method: 'PUT',
-      headers: getHeaders(currentUser),
-      body: JSON.stringify({ orderedUserIds }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to reorder queue');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/cooking-duty/reorder`,
+      {
+        method: 'PUT',
+        headers: getHeaders(currentUser),
+        body: JSON.stringify({ orderedUserIds }),
+      },
+      () => fallbackStorage.reorderCookingQueue(orderedUserIds)
+    );
   },
 
   async skipCookingDuty(currentUser) {
-    const res = await fetch(`${BASE_URL}/cooking-duty/skip`, {
-      method: 'POST',
-      headers: getHeaders(currentUser),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Failed to skip cook');
-    return data;
+    return requestOrFallback(
+      `${BASE_URL}/cooking-duty/skip`,
+      {
+        method: 'POST',
+        headers: getHeaders(currentUser),
+      },
+      () => fallbackStorage.skipCookingDuty()
+    );
   },
 
   // Activity Logs
   async getLogs(params = {}) {
     const query = new URLSearchParams(params).toString();
     const url = query ? `${BASE_URL}/logs?${query}` : `${BASE_URL}/logs`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(await res.text());
-    return res.json();
+    return requestOrFallback(
+      url,
+      undefined,
+      () => fallbackStorage.getLogs()
+    );
   },
 };
